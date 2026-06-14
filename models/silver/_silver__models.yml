@@ -1,0 +1,29 @@
+version: 2
+
+models:
+  - name: stg_listings
+    description: "Table de staging nettoyée pour les logements Airbnb"
+    columns:
+      - name: listing_id
+        description: "Clé primaire unique du logement"
+        tests:
+          - unique
+          - not_null
+      - name: price_usd
+        description: "Prix de la nuitée converti en valeur numérique"
+        tests:
+          - not_null
+      - name: room_type
+        description: "Type de chambre proposée"
+        tests:
+          - accepted_values:
+              values: ['Entire home/apt', 'Private room', 'Shared room', 'Hotel room']
+
+  - name: stg_hosts
+    description: "Table de staging nettoyée pour les hôtes"
+    columns:
+      - name: host_id
+        description: "Clé primaire unique de l'hôte"
+        tests:
+          - unique
+          - not_null

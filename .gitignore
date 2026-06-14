@@ -1,0 +1,50 @@
+# =========================
+# ENVIRONNEMENT PYTHON
+# =========================
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# =========================
+# DATA / BASES LOCALES
+# =========================
+data/
+*.duckdb
+airbnb_analytics.duckdb
+
+# =========================
+# DBT
+# =========================
+target/
+dbt_packages/
+dbt_modules/
+logs/
+dbt_internal_packages/
+
+# =========================
+# CONFIG SENSIBLE
+# =========================
+.env
+*.env
+.user
+profiles.yml
+
+# =========================
+# JUPYTER / NOTEBOOK
+# =========================
+.ipynb_checkpoints/
+
+# =========================
+# SYSTEM
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# IDE
+# =========================
+.vscode/
+.idea/
