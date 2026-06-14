@@ -129,7 +129,6 @@ tables:
 * name: hosts
 
 
-
 #### Fichier models/bronze/src_listings.sql
 
 select * from {{ source('raw_airbnb', 'listings') }}
@@ -219,6 +218,35 @@ from listings l
 left join hosts h on l.host_id = h.host_id
 
 ---
+
+## Structure des Livrables Techniques (Arborescence)
+
+Voici l'organisation des fichiers et dossiers pour la partie Data Engineering :
+
+![Arborescence du Projet](arborescence.png)
+
+```text
+airbnb_analytics_platform/
+├── .gitignore
+├── README_DATA_ENGINEER.md
+├── airbnb_analytics.duckdb
+├── dbt_project.yml
+├── profiles.yml
+├── requirements.txt
+├── .venv/                  
+├── data/
+│   ├── hosts.csv
+│   └── listings.csv
+└── models/
+    ├── bronze/
+    │   ├── _bronze__sources.yml
+    │   ├── src_hosts.sql
+    │   └── src_listings.sql
+    ├── silver/
+    │   ├── stg_hosts.sql
+    │   └── stg_listings.sql
+    └── gold/
+        └── dim_listings_hosts.sql
 
 ## 5. Séquence d'Orchestration & Validation
 
