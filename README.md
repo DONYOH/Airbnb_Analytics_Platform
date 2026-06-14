@@ -1,259 +1,148 @@
-# Airbnb Analytics Platform — Documentation Technique Data Engineering
+# Airbnb Analytics Platform
 
-Ce document rassemble l'intégralité des livrables techniques, configurations, infrastructures et scripts de modélisation SQL développés par Kossi Eric Donyoh (Membre A) pour la plateforme analytique d'Airbnb.
+Mini plateforme analytique transformant des données Airbnb brutes en indicateurs
+métier, exposés via un dashboard interactif. Le pipeline suit une architecture
+en couches **Bronze → Silver → Gold** orchestrée par **dbt** sur **DuckDB**, et
+la restitution est faite avec **Streamlit**.
 
----
-
-## 1. Architecture Technique de la Solution
-
-La plateforme implémente une approche moderne de type ELT (Extract, Load, Transform) localisé, s'appuyant sur l'écosystème suivant :
-
-* DuckDB : Utilisé comme entrepôt de données (Data Warehouse) local à haute performance analytique (OLAP), évitant la lourdeur d'une infrastructure cloud pour ce volume de données.
-* dbt (Data Build Tool) : Utilisé pour l'orchestration, le versioning des transformations SQL et l'application des concepts de modélisation en couches logiques.
-
-Structure de l'architecture :
-
-* [ Fichiers Bruts .csv ] (situés dans le dossier data/)
-* En suite (Couche Bronze : Vues d'ingestion dans models/bronze/) ---► Pointage direct sans réplication
-* En suite (Couche Silver : Transtypage & Nettoyage dans models/silver/) ---► Tables physiques propres et indexées
-* En suite (Couche Gold : Data Marts - Partie A dans models/gold/dim_listings_hosts.sql) ---► Modèle dimensionnel consolidé
+L'un des axes d'analyse imposés est l'étude de l'impact des **nuits de pleine lune**
+sur les avis clients.
 
 ---
 
-## 2. Périmètre de Responsabilité (Membre A)
+## Stack technique
 
-Conformément à la planification équitable du binôme, mon périmètre englobe l'ensemble des fondations de la plateforme, de l'ingestion brute jusqu'au premier niveau de modélisation métier :
-
-1. Infrastructure & Setup : Initialisation du projet dbt, isolation de l'environnement virtuel et configuration de la connexion DuckDB.
-2. Couche Bronze : Déclaration du manifeste de sourcing externe DuckDB et création des passes-plats SQL.
-3. Couche Silver : Écriture des algorithmes de nettoyage (conversion monétaire via Regex, reformatage des indicateurs booléens).
-4. Couche Gold (Partie Dimensionnelle) : Jointure et dénormalisation des entités Logements et Hôtes pour fournir une structure prête à l'analyse.
-
----
-
-## 3. Initialisation de l'Environnement Virtuel (.venv)
-
-Pour isoler les dépendances et garantir la parfaite reproductibilité du pipeline d'ingénierie, exécutez la séquence suivante dans le terminal :
-
-# 1. Création de l'environnement virtuel Python
-
-python3 -m venv .venv
-
-# 2. Activation de l'environnement
-
-# Sur Mac / Linux :
-
-source .venv/bin/activate
-
-# Sur Windows (PowerShell) :
-
-.venv\Scripts\Activate.ps1
-
-# Sur Windows (cmd) :
-
-.venv\Scripts\activate
-
-# 3. Mise à niveau de pip et installation des packages requis pour la partie Data Engineering
-
-pip install --upgrade pip
-pip install dbt-core==1.8.2 dbt-duckdb==1.8.1 duckdb==1.0.0
+| Outil | Rôle |
+|-------|------|
+| **DuckDB** | Moteur analytique local (stockage + requêtes) |
+| **dbt** | Transformations SQL et tests de qualité (Bronze / Silver / Gold) |
+| **GitHub** | Versioning et collaboration |
+| **Streamlit + Plotly** | Dashboard interactif |
 
 ---
 
-## 4. Fichiers de Configuration & Codes Sources (Partie DE)
+## Architecture
 
-### Fichier .gitignore
+```
+        CSV bruts (S3)
+              │
+              ▼
+   ┌──────────────────────┐
+   │ BRONZE  (vues)       │  src_hosts · src_listings · src_reviews
+   │  copie 1:1 du brut   │
+   └──────────┬───────────┘
+              ▼
+   ┌──────────────────────┐
+   │ SILVER  (vues)       │  stg_hosts · stg_listings · stg_reviews
+   │  nettoyage + typage  │  + tests qualité (unique / not_null / valeurs)
+   └──────────┬───────────┘
+              ▼
+   ┌──────────────────────┐
+   │ GOLD    (tables)     │  gold_reviews_enriched (faits)
+   │  indicateurs métier  │  gold_listing_metrics · gold_host_metrics
+   │                      │  gold_review_trends · gold_full_moon_effect
+   └──────────┬───────────┘
+              ▼
+        Streamlit (DuckDB)
+              ▼
+        Business Users
+```
 
-.venv/
-**pycache**/
-target/
-dbt_packages/
-*.duckdb
-.DS_Store
+La table **`gold_reviews_enriched`** (1 ligne = 1 avis, enrichi du logement, de
+l'hôte et du flag pleine lune) est le point d'entrée du dashboard : tous les
+filtres et agrégations sont calculés en SQL directement dessus.
 
-### Fichier profiles.yml
+---
 
+## Installation
+
+```bash
+# 1. Cloner le dépôt
+git clone https://github.com/DONYOH/Airbnb_Analytics_Platform.git
+cd Airbnb_Analytics_Platform
+
+# 2. Environnement Python + dépendances
+python -m venv .venv
+# Windows : .venv\Scripts\activate   |   macOS/Linux : source .venv/bin/activate
+pip install -r requirements.txt
+
+# 3. Récupérer les données dans le dossier data/
+mkdir -p data
+cd data
+curl -L -O https://logbrain-datasets.s3.eu-west-1.amazonaws.com/airbnb/hosts.csv
+curl -L -O https://logbrain-datasets.s3.eu-west-1.amazonaws.com/airbnb/listings.csv
+curl -L -O https://logbrain-datasets.s3.eu-west-1.amazonaws.com/airbnb/reviews.csv
+cd ..
+```
+
+Le fichier `seed_full_moon_dates.csv` est versionné dans `seeds/` (c'est un seed dbt).
+
+`profiles.yml` (connexion DuckDB) est fourni à la racine du projet :
+
+```yaml
 airbnb_project:
-outputs:
-dev:
-type: duckdb
-path: airbnb_analytics.duckdb
-threads: 4
-target: dev
+---
 
-### Fichier dbt_project.yml
+## Exécution
 
-name: 'airbnb_project'
-version: '1.0.0'
-config-version: 2
+```bash
+# Générer la base DuckDB (Bronze → Silver → Gold)
+dbt seed     # charge les dates de pleine lune
+dbt run      # construit tous les modèles
+dbt test     # contrôle qualité des données
 
-profile: 'airbnb_project'
+# Documentation + lineage
+dbt docs generate
+dbt docs serve
 
-model-paths: ["models"]
-seed-paths: ["seeds"]
-test-paths: ["tests"]
-target-path: "target"
-clean-targets:
-
-* "target"
-* "dbt_packages"
-
-models:
-airbnb_project:
-bronze:
-materialized: view      # Les sources restent des vues pour optimiser l'espace
-silver:
-materialized: table     # Performance accrue pour les nettoyages intermédiaires
-gold:
-materialized: table     # Tables finales indexées prêtes pour la BI
+# Lancer le dashboard
+streamlit run app.py
+```
 
 ---
 
-### 4.1 Couche Bronze (Ingestion Externe)
+## Fonctionnalités du dashboard
 
-#### Fichier models/bronze/_bronze__sources.yml
+**Filtres dynamiques** (barre latérale) : type de logement, hôte, fourchette de
+prix, statut superhost, période, pleine lune / hors pleine lune.
 
-version: 2
+**4 axes de visualisation :**
 
-sources:
+1. **Logements** — prix moyen par type, top 10 des logements par volume d'avis.
+2. **Hôtes** — top 10 des hôtes les plus actifs, distinction superhost / standard.
+3. **Avis** — volume d'avis dans le temps, répartition des sentiments.
+4. **Pleine lune** — comparaison du % d'avis positifs pleine lune vs hors pleine lune.
 
-* name: raw_airbnb
-schema: main
-meta:
-# Utilisation du chemin relatif explicite pour la portabilité du projet
-
-
-external_location: "./data/{name}.csv"
-tables:
-* name: listings
-* name: hosts
-
-
-#### Fichier models/bronze/src_listings.sql
-
-select * from {{ source('raw_airbnb', 'listings') }}
-
-#### Fichier models/bronze/src_hosts.sql
-
-select * from {{ source('raw_airbnb', 'hosts') }}
+**Indicateurs clés (KPI)** recalculés à chaque filtre : nombre d'avis, de logements,
+d'hôtes, % d'avis positifs, prix moyen.
 
 ---
 
-### 4.2 Couche Silver (Staging & Transtypage)
+## Notes d'analyse (choix liés aux données)
 
-#### Fichier models/silver/stg_listings.sql
+- Les données **ne contiennent pas de quartier** : le filtre est remplacé par
+  type de logement / hôte / prix.
+- Les avis n'ont **pas de note numérique** mais un **sentiment** (positive /
+  neutral / negative) : les indicateurs de qualité sont exprimés en **% d'avis
+  positifs**, et non en note moyenne.
+- Les avis bruts n'ayant pas d'identifiant, une **clé technique `review_id`** est
+  générée en couche Silver.
+- **Résultat pleine lune :** environ 56,4 % d'avis positifs les nuits de pleine
+  lune contre 56,7 % le reste du temps — l'écart est négligeable, la pleine lune
+  n'a pas d'effet notable sur la satisfaction.
 
-with source as (
-select * from {{ ref('src_listings') }}
-)
+## Qualité des données (tests dbt)
 
-select
-cast(id as bigint) as listing_id,
-listing_url,
-name as listing_name,
-room_type,
-cast(minimum_nights as integer) as min_nights,
-cast(host_id as bigint) as host_id,
-
-```
--- Extraction et nettoyage de la chaîne prix (ex: $1,250.00 -> 1250.00)
-cast(regexp_replace(price, '[$,]', '', 'g') as decimal(10,2)) as price_usd,
-
-cast(created_at as timestamp) as created_at_ts,
-cast(updated_at as timestamp) as updated_at_ts
-
-```
-
-from source
-
-#### Fichier models/silver/stg_hosts.sql
-
-with source as (
-select * from {{ ref('src_hosts') }}
-)
-
-select
-cast(id as bigint) as host_id,
-name as host_name,
-
-```
--- Transtypage du flag de type texte 't'/'f' en véritable type booléen
-case 
-    when is_superhost = 't' then true 
-    when is_superhost = 'f' then false 
-    else null 
-end as is_superhost,
-
-cast(created_at as timestamp) as created_at_ts,
-cast(updated_at as timestamp) as updated_at_ts
-
-```
-
-from source
+22 tests automatisés : unicité des clés (`listing_id`, `host_id`, `review_id`),
+contraintes `not_null`, intégrité référentielle entre les avis et les logements,
+et valeurs autorisées pour les types de logement et les sentiments.
 
 ---
 
-### 4.3 Couche Gold (Modélisation Dimensionnelle)
+## Répartition des tâches
 
-#### Fichier models/gold/dim_listings_hosts.sql
-
-with listings as (
-select * from {{ ref('stg_listings') }}
-),
-hosts as (
-select * from {{ ref('stg_hosts') }}
-)
-
--- Création de la dimension consolidée dénormalisée pour le dashboard de restitution
-select
-l.listing_id,
-l.listing_name,
-l.room_type,
-l.min_nights,
-l.price_usd,
-h.host_id,
-h.host_name,
-h.is_superhost
-from listings l
-left join hosts h on l.host_id = h.host_id
-
----
-
-## Structure des Livrables Techniques (Arborescence)
-
-Voici l'organisation des fichiers et dossiers pour la partie Data Engineering :
-
-```text
-airbnb_analytics_platform/
-├── .gitignore
-├── README_DATA_ENGINEER.md
-├── airbnb_analytics.duckdb
-├── dbt_project.yml
-├── profiles.yml
-├── requirements.txt
-├── .venv/                  
-├── data/
-│   ├── hosts.csv
-│   └── listings.csv
-└── models/
-    ├── bronze/
-    │   ├── _bronze__sources.yml
-    │   ├── src_hosts.sql
-    │   └── src_listings.sql
-    ├── silver/
-    │   ├── stg_hosts.sql
-    │   └── stg_listings.sql
-    └── gold/
-        └── dim_listings_hosts.sql
-
-## 5. Séquence d'Orchestration & Validation
-
-Pour tester, compiler et déployer l'intégralité de ma section d'infrastructure de données, exécutez la commande suivante dans le terminal (avec l'environnement .venv actif) :
-
-# Nettoyage et compilation du pipeline
-
-dbt clean && dbt compile
-
-# Matérialisation des vues Bronze, des tables Silver et de la dimension Gold dans DuckDB
-
-dbt run
+| Membre | Périmètre |
+|--------|-----------|
+| **Eric** | Setup (repo, dbt, DuckDB), couches Bronze & Silver `hosts` / `listings`, tests, documentation des modèles |
+| **mky** | Bronze & Silver `reviews`, intégration pleine lune (seed), table de faits enrichie + couche Gold (indicateurs logements / hôtes / avis / pleine lune), tests associés |
+| **Sofiane** | Application Streamlit (4 visualisations + filtres dynamiques), génération de la documentation dbt + lineage, README, QA finale |
