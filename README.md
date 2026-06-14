@@ -223,8 +223,6 @@ left join hosts h on l.host_id = h.host_id
 
 Voici l'organisation des fichiers et dossiers pour la partie Data Engineering :
 
-![Arborescence du Projet](arborescence.png)
-
 ```text
 airbnb_analytics_platform/
 ├── .gitignore
