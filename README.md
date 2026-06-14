@@ -81,14 +81,6 @@ Le fichier `seed_full_moon_dates.csv` est versionné dans `seeds/` (c'est un see
 
 ```yaml
 airbnb_project:
-  target: dev
-  outputs:
-    dev:
-      type: duckdb
-      path: airbnb_analytics.duckdb
-      threads: 4
-```
-
 ---
 
 ## Exécution
@@ -138,8 +130,6 @@ d'hôtes, % d'avis positifs, prix moyen.
 - **Résultat pleine lune :** environ 56,4 % d'avis positifs les nuits de pleine
   lune contre 56,7 % le reste du temps — l'écart est négligeable, la pleine lune
   n'a pas d'effet notable sur la satisfaction.
-
----
 
 ## Qualité des données (tests dbt)
 

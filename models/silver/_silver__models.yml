@@ -9,10 +9,12 @@ models:
         tests:
           - unique
           - not_null
+
       - name: price_usd
         description: "Prix de la nuitée converti en valeur numérique"
         tests:
           - not_null
+
       - name: room_type
         description: "Type de chambre proposée"
         tests:
@@ -27,3 +29,55 @@ models:
         tests:
           - unique
           - not_null
+
+  - name: stg_reviews
+    description: "Table de staging nettoyée pour les avis clients Airbnb"
+    columns:
+      - name: review_id
+        description: "Identifiant unique de l'avis"
+        tests:
+          - unique
+          - not_null
+
+      - name: listing_id
+        description: "Identifiant du logement associé à l'avis"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_listings')
+              field: listing_id
+
+      - name: review_date
+        description: "Date de l'avis"
+        tests:
+          - not_null
+
+      - name: sentiment
+        description: "Sentiment de l'avis"
+        tests:
+          - accepted_values:
+              values: ['positive', 'negative', 'neutral']
+
+  - name: stg_full_moon_dates
+    description: "Table contenant les dates de pleine lune"
+    columns:
+      - name: full_moon_date
+        description: "Date de pleine lune"
+        tests:
+          - unique
+          - not_null
+
+  - name: stg_reviews_full_moon
+    description: "Table croisant les avis clients avec les dates de pleine lune"
+    columns:
+      - name: review_id
+        description: "Identifiant unique de l'avis"
+        tests:
+          - unique
+          - not_null
+
+      - name: is_full_moon
+        description: "Indique si l'avis correspond à une nuit de pleine lune"
+        tests:
+          - accepted_values:
+              values: [true, false]
