@@ -1,0 +1,10 @@
+version: 2
+
+sources:
+  - name: raw_airbnb
+    schema: main
+    meta:
+      external_location: "data/{name}.csv"
+    tables:
+      - name: listings
+      - name: hosts
