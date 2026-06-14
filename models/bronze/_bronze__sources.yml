@@ -8,3 +8,5 @@ sources:
     tables:
       - name: listings
       - name: hosts
+      - name: reviews
+      - name: full_moon_dates
